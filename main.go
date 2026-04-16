@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -20,6 +21,7 @@ import (
 func getImageFiles(dir string) ([]string, error) {
 	var imageFiles []string
 	imageExts := map[string]bool{
+		".dng":  true,
 		".jpg":  true,
 		".jpeg": true,
 		".png":  true,
@@ -48,8 +50,8 @@ func getImageFiles(dir string) ([]string, error) {
 	return imageFiles, nil
 }
 
-// 重命名图片文件
-func renameImages(dir string, dryRun bool) error {
+// 重命名图片文件，startNum 为起始编号，digits 为文件名数字位数
+func renameImages(dir string, dryRun bool, startNum int, digits int) error {
 	// 1. 获取所有图片文件
 	imageFiles, err := getImageFiles(dir)
 	if err != nil {
@@ -70,7 +72,7 @@ func renameImages(dir string, dryRun bool) error {
 
 	for i, oldFile := range imageFiles {
 		ext := filepath.Ext(oldFile)
-		newName := fmt.Sprintf("%04d%s", i+1, ext)
+		newName := fmt.Sprintf("%0*d%s", digits, startNum+i, ext)
 
 		// 如果新旧文件名相同，跳过
 		if oldFile == newName {
@@ -139,16 +141,48 @@ func renameImages(dir string, dryRun bool) error {
 func main() {
 	if len(os.Args) < 2 {
 		fmt.Println("使用方法:")
-		fmt.Println("  预览模式: go run main.go <目录路径> preview")
-		fmt.Println("  执行重命名: go run main.go <目录路径>")
-		fmt.Println("\n示例:")
-		fmt.Println("  go run main.go ./photos preview")
-		fmt.Println("  go run main.go ./photos")
+		fmt.Println("  go run main.go <目录路径> [起始编号] [digits=位数] [preview]")
+		fmt.Println()
+		fmt.Println("参数说明:")
+		fmt.Println("  目录路径      必填，图片所在目录")
+		fmt.Println("  起始编号      可选，文件名起始编号，默认为 1")
+		fmt.Println("  digits=N     可选，文件名数字位数，默认为 4")
+		fmt.Println("  preview      可选，预览模式，不实际执行重命名")
+		fmt.Println()
+		fmt.Println("示例:")
+		fmt.Println("  go run main.go ./photos                        # 0001, 0002, ...")
+		fmt.Println("  go run main.go ./photos 2001                   # 2001, 2002, ...")
+		fmt.Println("  go run main.go ./photos digits=6               # 000001, 000002, ...")
+		fmt.Println("  go run main.go ./photos 2001 digits=6          # 002001, 002002, ...")
+		fmt.Println("  go run main.go ./photos 2001 digits=6 preview  # 预览模式")
 		os.Exit(1)
 	}
 
 	dir := os.Args[1]
-	dryRun := len(os.Args) > 2 && os.Args[2] == "preview"
+	startNum := 1
+	digits := 4
+	dryRun := false
+
+	// 解析剩余参数
+	for _, arg := range os.Args[2:] {
+		if arg == "preview" {
+			dryRun = true
+		} else if strings.HasPrefix(arg, "digits=") {
+			num, err := strconv.Atoi(strings.TrimPrefix(arg, "digits="))
+			if err != nil || num < 1 {
+				fmt.Printf("错误: 位数 '%s' 无效，必须是大于 0 的整数\n", arg)
+				os.Exit(1)
+			}
+			digits = num
+		} else {
+			num, err := strconv.Atoi(arg)
+			if err != nil || num < 1 {
+				fmt.Printf("错误: 起始编号 '%s' 无效，必须是大于 0 的整数\n", arg)
+				os.Exit(1)
+			}
+			startNum = num
+		}
+	}
 
 	// 检查目录是否存在
 	if info, err := os.Stat(dir); err != nil || !info.IsDir() {
@@ -157,12 +191,13 @@ func main() {
 	}
 
 	if dryRun {
-		fmt.Println("=== 预览模式 ===\n")
+		fmt.Println("=== 预览模式 ===")
 	} else {
-		fmt.Println("=== 执行模式 ===\n")
+		fmt.Println("=== 执行模式 ===")
 	}
+	fmt.Printf("起始编号: %0*d, 位数: %d\n\n", digits, startNum, digits)
 
-	if err := renameImages(dir, dryRun); err != nil {
+	if err := renameImages(dir, dryRun, startNum, digits); err != nil {
 		fmt.Printf("错误: %v\n", err)
 		os.Exit(1)
 	}
