@@ -21,6 +21,7 @@ import (
 func getImageFiles(dir string) ([]string, error) {
 	var imageFiles []string
 	imageExts := map[string]bool{
+		".nef":  true,
 		".dng":  true,
 		".jpg":  true,
 		".jpeg": true,
